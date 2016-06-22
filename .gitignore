@@ -1,0 +1,10 @@
+/output_data/
+/training_data/
+*.ckpt
+*.ckpt.meta
+*.pyc
+*.png
+checkpoint
+uniio.py
+datasets.py
+comp_velfields_2d_01.py
