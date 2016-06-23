@@ -30,22 +30,93 @@ def bias_variable(shape):
   initial = tf.constant(0.1, shape=shape)
   return tf.Variable(initial)
 
-n_code = 1000
+def conv2d(x, W):
+  return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+
+def max_pool_2x2(x):
+  return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
+                        strides=[1, 2, 2, 1], padding='SAME')
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
+x_conv = tf.reshape(x_image, [-1, 64, 64, 3])
 x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
-W_1 = weight_variable([12288, n_code])
-b_1 = bias_variable([n_code])
+# Weights and Biases
+n_code = 100
+patchsize = 5
+num_channels = 3
+depth = 16
+layer2size = 50
+batch_size = tf.shape(x_image)[0]
 
-z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
+# convolutions
+We_1 = weight_variable([patchsize, patchsize, num_channels, depth])
+be_1 = bias_variable([depth])
 
-W_2 = weight_variable([n_code, 12288])
-b_2 = bias_variable([12288])
+We_2 = weight_variable([patchsize, patchsize, depth, depth])
+be_2 = bias_variable([depth])
 
-y = tf.nn.tanh(tf.matmul(z, W_2) + b_2)
+conv1 = conv2d(x_conv, We_1)
+lay1 = tf.nn.relu(conv1 + be_1)
+lay1 = max_pool_2x2(lay1)
+
+conv2 = conv2d(lay1, We_2)
+lay2 = tf.nn.relu(conv2 + be_2)
+lay2 = max_pool_2x2(lay2)
+
+We_3 = weight_variable([16*16*depth, 512])
+be_3 = bias_variable([512])
+
+We_4 = weight_variable([512, 100])
+be_4 = bias_variable([100])
+
+lay2_s = lay2.get_shape().as_list()
+lay2_reshape = tf.reshape(lay2, [-1, lay2_s[1] * lay2_s[2] * lay2_s[3]])
+lay3 = tf.nn.relu(tf.matmul(lay2_reshape, We_3) + be_3)
+encoded = tf.matmul(lay3, We_4) + be_4
+
+# decoding try
+Wd_1 = weight_variable([100, 512])
+bd_1 = bias_variable([512])
+
+Wd_2 = weight_variable([512, 4096])
+bd_2 = bias_variable([4096])
+
+lay4 = tf.nn.relu(tf.matmul(encoded, Wd_1) + bd_1)
+lay5 = tf.nn.relu(tf.matmul(lay4, Wd_2) + bd_2)
+
+# deconvolutions
+lay5_reshape = tf.reshape(lay5, [-1, 16, 16, 16])
+deconv1_shape = tf.pack([batch_size, 16, 16, 16]
+Wd_3 = weight_variable([5, 5, depth, depth])
+bd_3 = bias_variable([depth])
+deconv1 = tf.nn.conv2d_transpose(lay5_reshape, wd_3,
+                                 output_shape = deconv1_shape,
+                                 strides=[1,1,1,1], padding='SAME')
+deconv1 = tf.nn.relu(deconv1 + bd_3)
+
+
+
+h_pool3 = tf.nn.relu(tf.nn.conv2d_transpose(h_conv5, W_pool3, output_shape = deconv_shape_pool3, strides=[1,2,2,1], padding='SAME') + b_pool3)
+
+
+lay6 = tf.nn.relu(tf.matmul(lay5, Wd_3) + bd_3)
+
+y = lay6
 y_image = tf.reshape(y, [-1,64,64,3])
+
+#z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
+#W_11 = weight_variable([n_code, 150])
+#b_11 = bias_variable([150])
+#zz = tf.nn.relu(tf.matmul(z, W_11) + b_11)
+#W_22 = weight_variable([150, n_code])
+#b_22 = bias_variable([n_code])
+#yy = tf.nn.relu(tf.matmul(zz, W_22) + b_22)
+#W_2 = weight_variable([n_code, 12288])
+#b_2 = bias_variable([12288])
+#y = tf.nn.tanh(tf.matmul(yy, W_2) + b_2)
+#y_image = tf.reshape(y, [-1,64,64,3])
 
 #============ training your model =============
 
@@ -62,7 +133,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(1000):
+for i in range(250):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
