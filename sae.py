@@ -31,25 +31,85 @@ def bias_variable(shape):
   initial = tf.constant(0.1, shape=shape)
   return tf.Variable(initial)
 
-n_code = 1000
+#convolution helper function
+def conv2d(x, W):
+    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+
+def deconv2d(x, W, output_shape):
+    return tf.nn.conv2d_transpose(x,W, output_shape, strides=[1,1,1,1], padding='SAME')
+
+def max_pool_2x2(x):
+    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],strides=[1, 2, 2, 1], padding='SAME')
+
+
+n_code = 16*16*3
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
-x = tf.reshape(x_image, [-1,12288])
+#x = tf.reshape(x_image, [-1,12288])
+x = tf.reshape(x_image, [-1, 64, 64,3])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
-W_1 = weight_variable([12288, n_code])
-b_1 = bias_variable([n_code])
+# W_1 = weight_variable([12288, n_code])
+# b_1 = bias_variable([n_code])
+#
+# z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
+#
+# W_2 = weight_variable([n_code, 12288])
+# b_2 = bias_variable([12288])
+# y = tf.nn.tanh(tf.matmul(z, W_2) + b_2)
 
-z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
 
-W_2 = weight_variable([n_code, 12288])
-b_2 = bias_variable([12288])
+#number feature maps
+num_features= 12
 
-y = tf.nn.tanh(tf.matmul(z, W_2) + b_2)
+W_conv1 = weight_variable([5,5,3,num_features])
+b_conv1 = bias_variable([num_features])
+h_conv1 = tf.nn.relu(conv2d(x, W_conv1) + b_conv1)
+h_pool1 = max_pool_2x2(h_conv1) #size = 32x32x12
+
+W_conv2 = weight_variable([5,5,num_features, num_features*2])
+b_conv2 = bias_variable([num_features*2])
+h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+h_pool2 = max_pool_2x2(h_conv2) #size = 16x16x24
+
+h_pool21d = tf.reshape(h_pool2, [-1, 16*16*24])
+
+#'compress' features into a middle layer representation and scale it
+W_recon1 = weight_variable([16*16*24, 16*16*3])
+b_recon1 = bias_variable([16*16*3])
+h_recon1 = tf.nn.tanh(tf.matmul(h_pool21d, W_recon1) + b_recon1)
+
+#scale it to 32x32x3
+W_recon2 = weight_variable([16*16*3, 32*32*3])
+b_recon2 = bias_variable([32*32*3])
+h_recon2 = tf.nn.tanh(tf.matmul(h_recon1, W_recon2) + b_recon2)
+
+W_y = weight_variable([32*32*3, 64*64*3])
+b_y = bias_variable([64*64*3])
+y = tf.nn.tanh(tf.matmul(h_recon2, W_y) + b_y)
+
+# W_conv1x1 = weight_variable([1,1, num_features*2, num_features])
+# b_conv1x1 = bias_variable([num_features])
+# h_conv1x1 = tf.nn.relu(conv2d(h_pool2, W_conv1x1) + b_conv1x1)
+
+
+#Implement decoder part here
+
+# W_deconv1 = weight_variable([5,5, 3, num_features])
+# b_deconv1 = bias_variable([32,32,3])
+#
+# batch_size = tf.shape(x)[0]
+# y_int = tf.nn.relu(deconv2d(h_pool1, W_deconv1, tf.pack([batch_size,32,32,3])) + b_deconv1)
+# y_int2 = tf.reshape(y_int, [-1, 32*32*3])
+#
+# W_2 = weight_variable([32*32*3, 12288])
+# b_2 = bias_variable([12288])
+#
+# y = tf.nn.tanh(tf.matmul(y_int2, W_2) + b_2)
 y_image = tf.reshape(y, [-1,64,64,3])
 
 #============ training your model =============
-
+x = tf.reshape(x_image, [-1,12288])
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
