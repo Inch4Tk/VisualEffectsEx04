@@ -202,7 +202,7 @@ y_image = dlay4
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.001*weight_penalty
+loss = l2_loss + 0.02*weight_penalty
 
 train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
 init_op = tf.initialize_all_variables()
@@ -212,7 +212,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(1000):
+for i in range(200):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
@@ -239,7 +239,29 @@ score = (1 - n_code / float(64*64*3)) * (1 - err)
 print("Your score is %g"%score)
 
 #============ validating your model =============
+for i in range(5):
+    batch = sdf_data.train.next_batch(1)
+    ref = batch[0][0]
+    gen = sess.run(y_image, feed_dict={x_image:[ref], keep_prob: 1.0})
+    
+    fig, [ax1, ax2]= plt.subplots(1, 2, figsize=(6, 3))
+    _ = ax1.quiver(ref[:,:,0], ref[:,:,1], pivot='tail', color='k', scale=1 / 1)
+    _ = ax2.quiver(gen[0,:,:,0], gen[0,:,:,1], pivot='tail', color='k', scale=1 / 1)
 
+    ax1.set_xlim(0, 60)
+    ax1.set_ylim(0, 60)
+    ax2.set_xlim(0, 60)
+    ax2.set_ylim(0, 60)
+
+    ax1.get_xaxis().set_visible(False)
+    ax1.get_yaxis().set_visible(False)
+    ax2.get_xaxis().set_visible(False)
+    ax2.get_yaxis().set_visible(False)
+    
+    fig.savefig("derp_%g.png" % i)
+    train_loss = l2_loss.eval(feed_dict={x_image:[ref], alphas: batch[1], keep_prob: 1.0})
+    print("retested %i, loss %g"%(i, train_loss))
+    
 for i in range(5):
     ref = sdf_data.test.inputs[i]
     gen = sess.run(y_image, feed_dict={x_image:[ref], keep_prob: 1.0})
