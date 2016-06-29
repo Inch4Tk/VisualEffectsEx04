@@ -47,11 +47,11 @@ def pool_2x2(x, W):
   return tf.nn.conv2d(x, W, strides=[1, 2, 2, 1], padding='SAME')
 
 # Returns layer to pass on and output shape
-def add_conv_layer(input_data, input_shape, filter_list, target_depth):
+def add_conv_layer(input_data, input_shape, filter_list, target_depth, activation=tf.nn.relu):
   complete_filter = [filter_list[0], filter_list[1], input_shape[2], target_depth]
   W_conv = weight_variable(complete_filter)
   b_conv = bias_variable([target_depth])
-  layer = tf.nn.relu(conv2d(input_data, W_conv) + b_conv)
+  layer = activation(conv2d(input_data, W_conv) + b_conv)
   input_shape[2] = target_depth
   return (layer, input_shape)
 
@@ -61,11 +61,12 @@ def add_pool_layer(input_data, input_shape):
   input_shape[1] /= 2
   return (layer, input_shape)
 
-def add_deconv_layer(input_data, input_shape, filter_list, target_depth, batch_size):
+def add_deconv_layer(input_data, input_shape, filter_list, target_depth,
+                     batch_size, activation=tf.nn.relu):
   W_conv = weight_variable([filter_list[0], filter_list[1], target_depth, input_shape[2]])
   b_conv = bias_variable([target_depth])
   deconv_shape = tf.pack([batch_size, input_shape[0], input_shape[1], target_depth])
-  layer = tf.nn.relu(tf.nn.conv2d_transpose(input_data, W_conv, output_shape = deconv_shape, strides=[1,1,1,1], padding='SAME') + b_conv)
+  layer = activation(tf.nn.conv2d_transpose(input_data, W_conv, output_shape = deconv_shape, strides=[1,1,1,1], padding='SAME') + b_conv)
   out_shape = [input_shape[0], input_shape[1], target_depth]
   return (layer, out_shape)
 
@@ -75,6 +76,12 @@ def add_unpool_layer(input_data, input_shape, batch_size):
   layer = tf.nn.conv2d_transpose(input_data, W_conv, output_shape = deconv_shape, strides=[1,2,2,1], padding='SAME')
   out_shape = [input_shape[0]*2, input_shape[1]*2, input_shape[2]]
   return (layer, out_shape)
+
+def add_fully_connected(input_data, input_size, target_size, activation=tf.nn.relu):
+  W = weight_variable([input_size, target_size])
+  b = bias_variable([target_size])
+  layer = activation(tf.matmul(input_data, W,) + b)
+  return layer
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
 x = tf.reshape(x_image, [-1,12288])
@@ -92,24 +99,27 @@ x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 # Build autoencoder
 # Encoder
 lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 16)
-lay2, lay2size = add_pool_layer(lay1, lay1size)
-lay3, lay3size = add_conv_layer(lay2, lay2size, [4, 4], 32)
-lay4, lay4size = add_pool_layer(lay3, lay3size)
-lay5, lay5size = add_conv_layer(lay4, lay4size, [3, 3], 16)
-lay6, lay6size = add_pool_layer(lay5, lay5size)
-lay7, lay7size = add_conv_layer(lay6, lay6size, [2, 2], 4)
+#lay2, lay2size = add_pool_layer(lay1, lay1size)
+lay3, lay3size = add_conv_layer(lay1, lay1size, [4, 4], 32)
+#lay4, lay4size = add_pool_layer(lay3, lay3size)
+lay5, lay5size = add_conv_layer(lay3, lay3size, [3, 3], 16)
+red_lay5size = reduce_multiply(lay5size)
+lay6 = add_fully_connected(tf.reshape(lay5, [-1, red_lay5size]), red_lay5size, 1024)
+lay7 = add_fully_connected(lay6, 1024, 100)
 
-print("Size of compressed layer: %s, Total size: %d"%
-      (','.join(map(str, lay7size)) , reduce_multiply(lay7size)))
+#print("Size of compressed layer: %s, Total size: %d"%
+#      (','.join(map(str, lay7size)) , reduce_multiply(lay7size)))
 
 # Decoder
-dlay7, dlay7size = add_deconv_layer(lay7, lay7size, [2, 2], 16, batch_size)
-dlay6, dlay6size = add_unpool_layer(dlay7, dlay7size, batch_size)
-dlay5, dlay5size = add_deconv_layer(dlay6, dlay6size, [3, 3], 32, batch_size)
-dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
-dlay3, dlay3size = add_deconv_layer(dlay4, dlay4size, [4, 4], 16, batch_size)
-dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
-dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [5, 5], 3, batch_size)
+dlay7 = add_fully_connected(lay7, 100, 1024)
+dlay6 = add_fully_connected(dlay7, 1024, red_lay5size)
+reshapesize = [-1]
+reshapesize.extend(lay5size)
+dlay5, dlay5size = add_deconv_layer(tf.reshape(dlay6, reshapesize), lay5size, [3, 3], 32, batch_size)
+#dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
+dlay3, dlay3size = add_deconv_layer(dlay5, dlay5size, [4, 4], 16, batch_size)
+#dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
+dlay1, dlay1size = add_deconv_layer(dlay3, dlay3size, [5, 5], 3, batch_size)
 
 y_image = dlay1
 y = tf.reshape(dlay1, [-1, 12288])
