@@ -118,17 +118,27 @@ Wd_1 = weight_variable([2, 2, depth * 2, depth/4])
 bd_1 = bias_variable([depth * 2])
 deconv1_shape = tf.pack([batch_size, 8, 8, depth * 2])
 
+# Pool inversion
+Wd_2_pool = weight_variable([2, 2, depth * 2, depth * 2])
+deconv2_shape_pool = tf.pack([batch_size, 16, 16, depth * 2])
 Wd_2 = weight_variable([5, 5, depth, depth * 2])
 bd_2 = bias_variable([depth])
 deconv2_shape = tf.pack([batch_size, 16, 16, depth])
 
+# Pool inversion
+Wd_3_pool = weight_variable([2, 2, depth, depth])
+deconv3_shape_pool = tf.pack([batch_size, 32, 32, depth])
 Wd_3 = weight_variable([5, 5, depth, depth])
 bd_3 = bias_variable([depth])
 deconv3_shape = tf.pack([batch_size, 32, 32, depth])
 
+# Pool inversion
+Wd_4_pool = weight_variable([2, 2, depth, depth])
+deconv4_shape_pool = tf.pack([batch_size, 64, 64, depth])
 Wd_4 = weight_variable([5, 5, num_channels, depth])
 bd_4 = bias_variable([num_channels])
 deconv4_shape = tf.pack([batch_size, 64, 64, num_channels])
+
 
 # Applying decoding of fully connected layers        
 #lay4 = tf.nn.relu(tf.matmul(encoded, Wd_1) + bd_1)
@@ -138,24 +148,37 @@ deconv4_shape = tf.pack([batch_size, 64, 64, num_channels])
 #lay5_reshape = tf.reshape(lay5, [-1, 16, 16, 16])
 
 # Applying deconvolutions
+# decode layer1
 dlay1 = tf.nn.conv2d_transpose(lay4, Wd_1,
                                  output_shape = deconv1_shape,
                                  strides=[1,1,1,1], padding='SAME')
 dlay1 = tf.nn.relu(dlay1 + bd_1)
 
-dlay2 = tf.nn.conv2d_transpose(dlay1, Wd_2,
-                                 output_shape = deconv2_shape,
+# decode layer1
+dlay2_pool = tf.nn.conv2d_transpose(dlay1, Wd_2_pool,
+                                 output_shape = deconv2_shape_pool,
                                  strides=[1,2,2,1], padding='SAME')
+dlay2 = tf.nn.conv2d_transpose(dlay2_pool, Wd_2,
+                                 output_shape = deconv2_shape,
+                                 strides=[1,1,1,1], padding='SAME')
 dlay2 = tf.nn.relu(dlay2 + bd_2)
 
-dlay3 = tf.nn.conv2d_transpose(dlay2, Wd_3,
-                                 output_shape = deconv3_shape,
+# decode layer3
+dlay3_pool = tf.nn.conv2d_transpose(dlay2, Wd_3_pool,
+                                 output_shape = deconv3_shape_pool,
                                  strides=[1,2,2,1], padding='SAME')
+dlay3 = tf.nn.conv2d_transpose(dlay3_pool, Wd_3,
+                                 output_shape = deconv3_shape,
+                                 strides=[1,1,1,1], padding='SAME')
 dlay3 = tf.nn.relu(dlay3 + bd_3)
 
-dlay4 = tf.nn.conv2d_transpose(dlay3, Wd_4,
-                                 output_shape = deconv4_shape,
+# decode layer4
+dlay4_pool = tf.nn.conv2d_transpose(dlay3, Wd_4_pool,
+                                 output_shape = deconv4_shape_pool,
                                  strides=[1,2,2,1], padding='SAME')
+dlay4 = tf.nn.conv2d_transpose(dlay4_pool, Wd_4,
+                                 output_shape = deconv4_shape,
+                                 strides=[1,1,1,1], padding='SAME')
 dlay4 = tf.nn.relu(dlay4 + bd_4)
 
 
@@ -189,7 +212,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(250):
+for i in range(1000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
