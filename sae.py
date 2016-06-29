@@ -22,6 +22,12 @@ sess = tf.InteractiveSession()
 #============ model definition =============
 # define the computational graph
 
+def reduce_multiply(l):
+  x = 1
+  for i in l:
+    x *= i
+  return x
+
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
   return tf.Variable(initial)
@@ -34,8 +40,41 @@ def conv2d(x, W):
   return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
 def max_pool_2x2(x):
-  return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
-                        strides=[1, 2, 2, 1], padding='SAME')
+  return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+# pooling with conv2d
+def pool_2x2(x, W):
+  return tf.nn.conv2d(x, W, strides=[1, 2, 2, 1], padding='SAME')
+
+# Returns layer to pass on and output shape
+def add_conv_layer(input_data, input_shape, filter_list, target_depth):
+  complete_filter = [filter_list[0], filter_list[1], input_shape[2], target_depth]
+  W_conv = weight_variable(complete_filter)
+  b_conv = bias_variable([target_depth])
+  layer = tf.nn.relu(conv2d(input_data, W_conv) + b_conv)
+  input_shape[2] = target_depth
+  return (layer, input_shape)
+
+def add_pool_layer(input_data, input_shape):
+  layer = max_pool_2x2(input_data)
+  input_shape[0] /= 2
+  input_shape[1] /= 2
+  return (layer, input_shape)
+
+def add_deconv_layer(input_data, input_shape, filter_list, target_depth, batch_size):
+  W_conv = weight_variable([filter_list[0], filter_list[1], target_depth, input_shape[2]])
+  b_conv = bias_variable([target_depth])
+  deconv_shape = tf.pack([batch_size, input_shape[0], input_shape[1], target_depth])
+  layer = tf.nn.relu(tf.nn.conv2d_transpose(input_data, W_conv, output_shape = deconv_shape, strides=[1,1,1,1], padding='SAME') + b_conv)
+  out_shape = [input_shape[0], input_shape[1], target_depth]
+  return (layer, out_shape)
+
+def add_unpool_layer(input_data, input_shape, batch_size):
+  W_conv = weight_variable([2, 2, input_shape[2], input_shape[2]])
+  deconv_shape = tf.pack([batch_size, input_shape[0]*2, input_shape[1]*2, input_shape[2]])
+  layer = tf.nn.conv2d_transpose(input_data, W_conv, output_shape = deconv_shape, strides=[1,2,2,1], padding='SAME')
+  out_shape = [input_shape[0]*2, input_shape[1]*2, input_shape[2]]
+  return (layer, out_shape)
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
 x = tf.reshape(x_image, [-1,12288])
@@ -43,10 +82,6 @@ alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
 n_code = 100
-patchsize = 5
-num_channels = 3
-depth = 32
-layer2size = 50
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -54,157 +89,40 @@ keep_prob = tf.placeholder("float")
 x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
-#======================
-# Encoding
-# convolution and normal weights
-We_1 = weight_variable([patchsize, patchsize, num_channels, depth]) # 3,32
-be_1 = bias_variable([depth])
+# Build autoencoder
+# Encoder
+lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 16)
+lay2, lay2size = add_pool_layer(lay1, lay1size)
+lay3, lay3size = add_conv_layer(lay2, lay2size, [4, 4], 32)
+lay4, lay4size = add_pool_layer(lay3, lay3size)
+lay5, lay5size = add_conv_layer(lay4, lay4size, [3, 3], 16)
+lay6, lay6size = add_pool_layer(lay5, lay5size)
+lay7, lay7size = add_conv_layer(lay6, lay6size, [2, 2], 4)
 
-We_2 = weight_variable([patchsize, patchsize, depth, depth]) # 32,32
-be_2 = bias_variable([depth])
+print("Size of compressed layer: %s, Total size: %d"%
+      (','.join(map(str, lay7size)) , reduce_multiply(lay7size)))
 
-We_3 = weight_variable([patchsize, patchsize, depth, depth * 2]) # 32, 64
-be_3 = bias_variable([depth*2])
+# Decoder
+dlay7, dlay7size = add_deconv_layer(lay7, lay7size, [2, 2], 16, batch_size)
+dlay6, dlay6size = add_unpool_layer(dlay7, dlay7size, batch_size)
+dlay5, dlay5size = add_deconv_layer(dlay6, dlay6size, [3, 3], 32, batch_size)
+dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
+dlay3, dlay3size = add_deconv_layer(dlay4, dlay4size, [4, 4], 16, batch_size)
+dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
+dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [5, 5], 3, batch_size)
 
-We_4 = weight_variable([2, 2, depth*2, depth / 4]) # 64, 8
-be_4 = bias_variable([depth / 4])
-
-#We_3 = weight_variable([16*16*depth, 512])
-#be_3 = bias_variable([512])
-
-#We_4 = weight_variable([512, 100])
-#be_4 = bias_variable([100])
-
-# calc 1st convolution
-conv1 = conv2d(x_conv, We_1)
-lay1 = tf.nn.relu(conv1 + be_1)
-lay1 = max_pool_2x2(lay1)
-
-# calc 2nd convolution
-conv2 = conv2d(lay1, We_2)
-lay2 = tf.nn.relu(conv2 + be_2)
-lay2 = max_pool_2x2(lay2)
-
-# calc 3rd convolution
-conv3 = conv2d(lay2, We_3)
-lay3 = tf.nn.relu(conv3 + be_3)
-lay3 = max_pool_2x2(lay3)
-
-# calc 4th convolution
-conv4 = conv2d(lay3, We_4)
-lay4 = tf.nn.relu(conv4 + be_4) # encoded layer
-
-# Lowest layer is now: 8x8x8
-
-# reshape results
-#lay2_s = lay2.get_shape().as_list()
-#lay2_reshape = tf.reshape(lay2, [-1, lay2_s[1] * lay2_s[2] * lay2_s[3]])
-
-# Calculate 2x normal fully connected layers
-#lay3 = tf.nn.relu(tf.matmul(lay2_reshape, We_3) + be_3)
-#encoded = tf.nn.relu(tf.matmul(lay3, We_4) + be_4)
-
-#======================
-# Decoding
-# Variables for fully connected layers
-#Wd_1 = weight_variable([100, 512])
-#bd_1 = bias_variable([512])
-
-#Wd_2 = weight_variable([512, 4096])
-#bd_2 = bias_variable([4096])
-
-# Variables for Deconvolutions
-Wd_1 = weight_variable([2, 2, depth * 2, depth/4])
-bd_1 = bias_variable([depth * 2])
-deconv1_shape = tf.pack([batch_size, 8, 8, depth * 2])
-
-# Pool inversion
-Wd_2_pool = weight_variable([2, 2, depth * 2, depth * 2])
-deconv2_shape_pool = tf.pack([batch_size, 16, 16, depth * 2])
-Wd_2 = weight_variable([5, 5, depth, depth * 2])
-bd_2 = bias_variable([depth])
-deconv2_shape = tf.pack([batch_size, 16, 16, depth])
-
-# Pool inversion
-Wd_3_pool = weight_variable([2, 2, depth, depth])
-deconv3_shape_pool = tf.pack([batch_size, 32, 32, depth])
-Wd_3 = weight_variable([5, 5, depth, depth])
-bd_3 = bias_variable([depth])
-deconv3_shape = tf.pack([batch_size, 32, 32, depth])
-
-# Pool inversion
-Wd_4_pool = weight_variable([2, 2, depth, depth])
-deconv4_shape_pool = tf.pack([batch_size, 64, 64, depth])
-Wd_4 = weight_variable([5, 5, num_channels, depth])
-bd_4 = bias_variable([num_channels])
-deconv4_shape = tf.pack([batch_size, 64, 64, num_channels])
-
-
-# Applying decoding of fully connected layers        
-#lay4 = tf.nn.relu(tf.matmul(encoded, Wd_1) + bd_1)
-#lay5 = tf.nn.relu(tf.matmul(lay4, Wd_2) + bd_2)
-
-# Reshaping 
-#lay5_reshape = tf.reshape(lay5, [-1, 16, 16, 16])
-
-# Applying deconvolutions
-# decode layer1
-dlay1 = tf.nn.conv2d_transpose(lay4, Wd_1,
-                                 output_shape = deconv1_shape,
-                                 strides=[1,1,1,1], padding='SAME')
-dlay1 = tf.nn.relu(dlay1 + bd_1)
-
-# decode layer1
-dlay2_pool = tf.nn.conv2d_transpose(dlay1, Wd_2_pool,
-                                 output_shape = deconv2_shape_pool,
-                                 strides=[1,2,2,1], padding='SAME')
-dlay2 = tf.nn.conv2d_transpose(dlay2_pool, Wd_2,
-                                 output_shape = deconv2_shape,
-                                 strides=[1,1,1,1], padding='SAME')
-dlay2 = tf.nn.relu(dlay2 + bd_2)
-
-# decode layer3
-dlay3_pool = tf.nn.conv2d_transpose(dlay2, Wd_3_pool,
-                                 output_shape = deconv3_shape_pool,
-                                 strides=[1,2,2,1], padding='SAME')
-dlay3 = tf.nn.conv2d_transpose(dlay3_pool, Wd_3,
-                                 output_shape = deconv3_shape,
-                                 strides=[1,1,1,1], padding='SAME')
-dlay3 = tf.nn.relu(dlay3 + bd_3)
-
-# decode layer4
-dlay4_pool = tf.nn.conv2d_transpose(dlay3, Wd_4_pool,
-                                 output_shape = deconv4_shape_pool,
-                                 strides=[1,2,2,1], padding='SAME')
-dlay4 = tf.nn.conv2d_transpose(dlay4_pool, Wd_4,
-                                 output_shape = deconv4_shape,
-                                 strides=[1,1,1,1], padding='SAME')
-dlay4 = tf.nn.relu(dlay4 + bd_4)
-
-
-y = tf.reshape(dlay4, [-1,12288])
-y_image = dlay4
-
-#z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
-#W_11 = weight_variable([n_code, 150])
-#b_11 = bias_variable([150])
-#zz = tf.nn.relu(tf.matmul(z, W_11) + b_11)
-#W_22 = weight_variable([150, n_code])
-#b_22 = bias_variable([n_code])
-#yy = tf.nn.relu(tf.matmul(zz, W_22) + b_22)
-#W_2 = weight_variable([n_code, 12288])
-#b_2 = bias_variable([12288])
-#y = tf.nn.tanh(tf.matmul(yy, W_2) + b_2)
-#y_image = tf.reshape(y, [-1,64,64,3])
+y_image = dlay1
+y = tf.reshape(dlay1, [-1, 12288])
 
 #============ training your model =============
 
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.02*weight_penalty
+loss = l2_loss #+ 0.02*weight_penalty
 
-train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
+learning_rate = 1e-4
+train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 init_op = tf.initialize_all_variables()
 saver = tf.train.Saver()
 
