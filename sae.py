@@ -97,41 +97,46 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
+
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 100)
+dlay1 = add_fully_connected(lay1, 100, 12288)
+
 # Encoder
-lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 16)
+#lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 16)
 #lay2, lay2size = add_pool_layer(lay1, lay1size)
-lay3, lay3size = add_conv_layer(lay1, lay1size, [4, 4], 32)
+#lay3, lay3size = add_conv_layer(lay1, lay1size, [4, 4], 32)
 #lay4, lay4size = add_pool_layer(lay3, lay3size)
-lay5, lay5size = add_conv_layer(lay3, lay3size, [3, 3], 16)
-red_lay5size = reduce_multiply(lay5size)
-lay6 = add_fully_connected(tf.reshape(lay5, [-1, red_lay5size]), red_lay5size, 1024)
-lay7 = add_fully_connected(lay6, 1024, 100)
+#lay5, lay5size = add_conv_layer(lay3, lay3size, [3, 3], 16)
+#red_lay5size = reduce_multiply(lay5size)
+#lay6 = add_fully_connected(tf.reshape(lay5, [-1, red_lay5size]), red_lay5size, 1024)
+#lay7 = add_fully_connected(lay6, 1024, 100)
 
 #print("Size of compressed layer: %s, Total size: %d"%
 #      (','.join(map(str, lay7size)) , reduce_multiply(lay7size)))
 
 # Decoder
-dlay7 = add_fully_connected(lay7, 100, 1024)
-dlay6 = add_fully_connected(dlay7, 1024, red_lay5size)
-reshapesize = [-1]
-reshapesize.extend(lay5size)
-dlay5, dlay5size = add_deconv_layer(tf.reshape(dlay6, reshapesize), lay5size, [3, 3], 32, batch_size)
+#dlay7 = add_fully_connected(lay7, 100, 1024)
+#dlay6 = add_fully_connected(dlay7, 1024, red_lay5size)
+#reshapesize = [-1]
+#reshapesize.extend(lay5size)
+#dlay5, dlay5size = add_deconv_layer(tf.reshape(dlay6, reshapesize), lay5size, [3, 3], 32, batch_size)
 #dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
-dlay3, dlay3size = add_deconv_layer(dlay5, dlay5size, [4, 4], 16, batch_size)
+#dlay3, dlay3size = add_deconv_layer(dlay5, dlay5size, [4, 4], 16, batch_size)
 #dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
-dlay1, dlay1size = add_deconv_layer(dlay3, dlay3size, [5, 5], 3, batch_size)
+#dlay1, dlay1size = add_deconv_layer(dlay3, dlay3size, [5, 5], 3, batch_size)
 
-y_image = dlay1
-y = tf.reshape(dlay1, [-1, 12288])
-
+#y_image = dlay1
+#y = tf.reshape(dlay1, [-1, 12288])
+y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
+y = dlay1
 #============ training your model =============
 
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss #+ 0.02*weight_penalty
+loss = l2_loss + 0.005*weight_penalty
 
-learning_rate = 1e-4
+learning_rate = 1e-2
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 init_op = tf.initialize_all_variables()
 saver = tf.train.Saver()
@@ -140,7 +145,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(200):
+for i in range(201):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
@@ -148,8 +153,8 @@ for i in range(200):
     train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.8})
 
 # save the trained model
-model_file = saver.save(sess, "model.ckpt")
-print("Trained model saved to %s"%model_file)
+#model_file = saver.save(sess, "model.ckpt")
+#print("Trained model saved to %s"%model_file)
 #'''
 
 # alternatively restore the model
@@ -171,7 +176,7 @@ for i in range(5):
     batch = sdf_data.train.next_batch(1)
     ref = batch[0][0]
     gen = sess.run(y_image, feed_dict={x_image:[ref], keep_prob: 1.0})
-    
+       
     fig, [ax1, ax2]= plt.subplots(1, 2, figsize=(6, 3))
     _ = ax1.quiver(ref[:,:,0], ref[:,:,1], pivot='tail', color='k', scale=1 / 1)
     _ = ax2.quiver(gen[0,:,:,0], gen[0,:,:,1], pivot='tail', color='k', scale=1 / 1)
@@ -187,8 +192,9 @@ for i in range(5):
     ax2.get_yaxis().set_visible(False)
     
     fig.savefig("derp_%g.png" % i)
+    
     train_loss = l2_loss.eval(feed_dict={x_image:[ref], alphas: batch[1], keep_prob: 1.0})
-    print("retested %i, loss %g"%(i, train_loss))
+    print("loss on first batches %i, loss %g"%(i, train_loss))
     
 for i in range(5):
     ref = sdf_data.test.inputs[i]
@@ -212,6 +218,8 @@ for i in range(5):
 		# Docker users should uncomment the following line
 		# It will save the graphs to the disk for viewing
     fig.savefig("validate_%g.png" % i)
+    train_loss = l2_loss.eval(feed_dict={x_image:[ref], keep_prob: 1.0})
+    print("loss on first testdata %i, loss %g"%(i, train_loss))
 
 #====== write the data ==================
 
