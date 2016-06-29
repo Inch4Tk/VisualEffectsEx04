@@ -42,12 +42,61 @@ def max_pool_2x2(x):
     return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],strides=[1, 2, 2, 1], padding='SAME')
 
 
-n_code = 16*16*3
+
+n_code_part = 4*4
+n_code = n_code_part*3
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
-#x = tf.reshape(x_image, [-1,12288])
-x = tf.reshape(x_image, [-1, 64, 64,3])
+x = tf.reshape(x_image, [-1,12288])
+#x = tf.reshape(x_image, [-1, 64, 64,3])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
+
+x_split = tf.split(1, 3, x)
+y_list = []
+
+for x_part in x_split:
+    W_code1 = weight_variable([64*64, n_code_part])
+    b_code1 = bias_variable([n_code_part])
+
+    z_part = tf.nn.tanh(tf.matmul(x_part, W_code1)+ b_code1)
+
+    W_dec1 = weight_variable([n_code_part, 64*64])
+    b_dec1 = bias_variable([64*64])
+    y_part = tf.nn.tanh(tf.matmul(z_part, W_dec1) + b_dec1)
+    y_list.append(y_part)
+
+y = tf.concat(1, y_list)
+
+
+
+
+
+#W_conv1 = weight_variable([5,5, 3, 6])
+# b_conv1 = bias_variable([6])
+# h_conv1 = tf.nn.relu(conv2d(x, W_conv1)+b_conv1)
+# h_pool1 = max_pool_2x2(h_conv1)
+#
+# h_intm = tf.reshape(h_pool1, [-1, 32*32*6])
+# W_int1 = weight_variable([32*32*6, 64*64*6])
+# b_int1 = bias_variable([64*64*6])
+# h_int2 = tf.nn.tanh(tf.matmul(h_intm, W_int1) + b_int1)
+#
+# h_conv2 = tf.reshape(h_int2, [-1, 64, 64, 6])
+#
+# W_deconv1 = weight_variable([5,5,3,6])
+# b_deconv1 = bias_variable([3])
+# batch_size = tf.shape(x)[0]
+# y = tf.nn.relu(deconv2d(h_conv2, W_deconv1, tf.pack([batch_size, 64,64,3]))+b_deconv1)
+# y = tf.reshape(h_conv2, [-1, 12288])
+
+# W_1 = weight_variable([12288, n_code])
+# b_1 = bias_variable([n_code])
+# h_1 = tf.nn.tanh(tf.matmul(x, W_1) + b_1)
+#
+# W_2 = weight_variable([n_code, 12288])
+# b_2 = bias_variable([12288])
+# y = tf.nn.tanh(tf.matmul(h_1, W_2) + b_2)
+
 
 # W_1 = weight_variable([12288, n_code])
 # b_1 = bias_variable([n_code])
@@ -59,34 +108,24 @@ alphas = tf.placeholder(tf.float32, shape=[None, 1])
 # y = tf.nn.tanh(tf.matmul(z, W_2) + b_2)
 
 
-#number feature maps
-num_features= 12
-
-W_conv1 = weight_variable([5,5,3,num_features])
-b_conv1 = bias_variable([num_features])
-h_conv1 = tf.nn.relu(conv2d(x, W_conv1) + b_conv1)
-h_pool1 = max_pool_2x2(h_conv1) #size = 32x32x12
-
-W_conv2 = weight_variable([5,5,num_features, num_features*2])
-b_conv2 = bias_variable([num_features*2])
-h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-h_pool2 = max_pool_2x2(h_conv2) #size = 16x16x24
-
-h_pool21d = tf.reshape(h_pool2, [-1, 16*16*24])
-
-#'compress' features into a middle layer representation and scale it
-W_recon1 = weight_variable([16*16*24, 16*16*3])
-b_recon1 = bias_variable([16*16*3])
-h_recon1 = tf.nn.tanh(tf.matmul(h_pool21d, W_recon1) + b_recon1)
-
-#scale it to 32x32x3
-W_recon2 = weight_variable([16*16*3, 32*32*3])
-b_recon2 = bias_variable([32*32*3])
-h_recon2 = tf.nn.tanh(tf.matmul(h_recon1, W_recon2) + b_recon2)
-
-W_y = weight_variable([32*32*3, 64*64*3])
-b_y = bias_variable([64*64*3])
-y = tf.nn.tanh(tf.matmul(h_recon2, W_y) + b_y)
+# #number feature maps
+# num_features= 12
+#
+# W_comp1 = weight_variable([12288, 32*32*3])
+#
+# #'compress' features into a middle layer representation and scale it
+# W_recon1 = weight_variable([16*16*24, 16*16*3])
+# b_recon1 = bias_variable([16*16*3])
+# h_recon1 = tf.nn.tanh(tf.matmul(h_pool21d, W_recon1) + b_recon1)
+#
+# #scale it to 32x32x3
+# W_recon2 = weight_variable([16*16*3, 32*32*3])
+# b_recon2 = bias_variable([32*32*3])
+# h_recon2 = tf.nn.tanh(tf.matmul(h_recon1, W_recon2) + b_recon2)
+#
+# W_y = weight_variable([32*32*3, 64*64*3])
+# b_y = bias_variable([64*64*3])
+# y = tf.nn.tanh(tf.matmul(h_recon2, W_y) + b_y)
 
 # W_conv1x1 = weight_variable([1,1, num_features*2, num_features])
 # b_conv1x1 = bias_variable([num_features])
