@@ -38,9 +38,7 @@ def max_pool_2x2(x):
                         strides=[1, 2, 2, 1], padding='SAME')
 
 def deconv2d(x, W, output_shape):
-    return tf.nn.conv2d_transpose(x, W, output_shape, strides=[1,2,2,1], padding='SAME')
-
-n_code = 100
+    return tf.nn.conv2d_transpose(x, W, output_shape, strides=[1,1,1,1], padding='SAME')
 
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
@@ -48,9 +46,11 @@ x = tf.reshape(x_image, [-1, 64,64,3])
 #x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
+#paramters
 batch_size = tf.shape(x)[0]
 num_feat_maps = 4
 num_channles = 3
+n_code = 100
 
 W_conv1 = weight_variable([5, 5, 3, 12])
 b_conv1 = bias_variable([12])
@@ -67,18 +67,20 @@ b_conv3 = bias_variable([48])
 h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
 h_pool3 = max_pool_2x2(h_conv3) #8x8x48
 
+h_rpool3 = tf.reshape(h_pool3, [-1, 8*8*48])
 
-W_deconv3 = weight_variable([5,5,24,48])
-b_decovn3 = bias_variable([24])
-h_deconv3 = tf.nn.relu(deconv2d(h_pool3, W_deconv3, [batch_size, 16, 16, 24]) + b_decovn3)
+W_fc1 = weight_variable([8*8*48, n_code])
+b_fc1 = bias_variable([n_code])
+h_fc1 = tf.nn.tanh(tf.matmul(h_rpool3, W_fc1) + b_fc1)
 
-W_deconv2 = weight_variable([5,5,12,24])
-b_decovn2 = bias_variable([12])
-h_deconv2 = tf.nn.relu(deconv2d(h_deconv3, W_deconv2, [batch_size, 32, 32, 12]) + b_decovn2)
+W_fc2 = weight_variable([n_code, 64*64*12])
+b_fc2 = bias_variable([64*64*12])
+h_fc2 = tf.nn.tanh(tf.matmul(h_fc1, W_fc2) + b_fc2)
+h_rfc2 = tf.reshape(h_fc2, [-1, 64,64,12])
 
 W_deconv1 = weight_variable([5,5,3,12])
 b_deconv1 = bias_variable([3])
-h_deconv = tf.nn.relu(deconv2d(h_deconv2, W_deconv1, tf.pack([batch_size, 64,64,3])) + b_deconv1)
+h_deconv = tf.nn.relu(deconv2d(h_rfc2, W_deconv1, tf.pack([batch_size, 64,64,3])) + b_deconv1)
 
 y = tf.reshape(h_deconv, [-1, 12288])
 y_image = tf.reshape(y, [-1,64,64,3])
