@@ -37,36 +37,21 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
+n_code = 1000
+
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
-x_conv = tf.reshape(x_image, [-1, 64, 64, 3])
 x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
-# Weights and Biases
-n_code = 12288
-batch_size = tf.shape(x_image)[0]
+W_1 = weight_variable([12288, n_code])
+b_1 = bias_variable([n_code])
 
-x_split = tf.split(1,3, x)
-y_list = []
-for x_part in x_split:
-    W_1 = weight_variable([4096, 4096])
-    b_1 = bias_variable([4096])
-    y_part = tf.nn.tanh(tf.matmul(x_part, W_1) + b_1)
+z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
 
-    # W_2 = weight_variable([2048, 4096])
-    # b_2 = bias_variable([4096])
-    # y_part = tf.nn.tanh(tf.matmul(z, W_2)+b_2)
+W_2 = weight_variable([n_code, 12288])
+b_2 = bias_variable([12288])
 
-    y_list.append(y_part)
-
-y = tf.concat(1, y_list)
-
-# W_1 = weight_variable([12288, n_code])
-# b_1 = bias_variable([n_code])
-# z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
-# W_2 = weight_variable([n_code, 12288])
-# b_2 = bias_variable([12288])
-# y = tf.nn.tanh(tf.matmul(x, W_2) + b_2)
+y = tf.nn.tanh(tf.matmul(z, W_2) + b_2)
 y_image = tf.reshape(y, [-1,64,64,3])
 
 #============ training your model =============
