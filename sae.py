@@ -38,27 +38,53 @@ def max_pool_2x2(x):
                         strides=[1, 2, 2, 1], padding='SAME')
 
 def deconv2d(x, W, output_shape):
-    return tf.nn.conv2d_transpose()
+    return tf.nn.conv2d_transpose(x, W, output_shape, strides=[1,2,2,1], padding='SAME')
 
 n_code = 100
 
+
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
-x = tf.reshape(x_image, [-1,12288])
+x = tf.reshape(x_image, [-1, 64,64,3])
+#x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
-W_1 = weight_variable([12288, n_code])
-b_1 = bias_variable([n_code])
+batch_size = tf.shape(x)[0]
+num_feat_maps = 4
+num_channles = 3
 
-z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
+W_conv1 = weight_variable([5, 5, 3, 12])
+b_conv1 = bias_variable([12])
+h_conv1 = tf.nn.relu(conv2d(x, W_conv1) + b_conv1)
+h_pool1 = max_pool_2x2(h_conv1) #32x32x12
 
-W_2 = weight_variable([n_code, 12288])
-b_2 = bias_variable([12288])
+W_conv2 = weight_variable([5, 5, 12, 24])
+b_conv2 = bias_variable([24])
+h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+h_pool2 = max_pool_2x2(h_conv2) #16x16x24
 
-y = tf.nn.tanh(tf.matmul(z, W_2) + b_2)
+W_conv3 = weight_variable([5, 5, 24, 48])
+b_conv3 = bias_variable([48])
+h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
+h_pool3 = max_pool_2x2(h_conv3) #8x8x48
+
+
+W_deconv3 = weight_variable([5,5,24,48])
+b_decovn3 = bias_variable([24])
+h_deconv3 = tf.nn.relu(deconv2d(h_pool3, W_deconv3, [batch_size, 16, 16, 24]) + b_decovn3)
+
+W_deconv2 = weight_variable([5,5,12,24])
+b_decovn2 = bias_variable([12])
+h_deconv2 = tf.nn.relu(deconv2d(h_deconv3, W_deconv2, [batch_size, 32, 32, 12]) + b_decovn2)
+
+W_deconv1 = weight_variable([5,5,3,12])
+b_deconv1 = bias_variable([3])
+h_deconv = tf.nn.relu(deconv2d(h_deconv2, W_deconv1, tf.pack([batch_size, 64,64,3])) + b_deconv1)
+
+y = tf.reshape(h_deconv, [-1, 12288])
 y_image = tf.reshape(y, [-1,64,64,3])
 
 #============ training your model =============
-
+x = tf.reshape(x, [-1, 12288])
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
