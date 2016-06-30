@@ -88,7 +88,7 @@ x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
-n_code = 25
+n_code = 50
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -97,50 +97,42 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
+lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [10, 10], 16)
+lay2, lay2size = add_pool_layer(lay1, lay1size)
+lay3, lay3size = add_conv_layer(lay2, lay2size, [5, 5], 32)
+lay4, lay4size = add_pool_layer(lay3, lay3size)
+lay5, lay5size = add_conv_layer(lay4, lay4size, [3, 3], 16)
+lay6, lay6size = add_pool_layer(lay5, lay5size)
+lay7 = add_fully_connected(tf.reshape(lay6, [-1, 1024]), 1024, 50, tf.nn.tanh)
 
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 1024, tf.nn.tanh)
+dlay7 = add_fully_connected(lay7, 50, 1024, tf.nn.tanh)
+reshapesize = [-1]
+reshapesize.extend(lay6size)
+dlay6, dlay6size = add_unpool_layer(tf.reshape(dlay7, reshapesize), lay6size, batch_size)
+dlay5, dlay5size = add_deconv_layer(dlay6, dlay6size, [3, 3], 32, batch_size)
+dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
+dlay3, dlay3size = add_deconv_layer(dlay4, dlay4size, [5, 5], 16, batch_size)
+dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
+dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [10, 10], 3, batch_size)
+
+#lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 1024, tf.nn.tanh)
 #lay2 = add_fully_connected(lay1, 256, 15, tf.nn.tanh)
 #dlay2 = add_fully_connected(lay2, 15, 256, tf.nn.tanh)
-reshapesize = [-1, 32, 32, 1]
-lay2, lay2size = add_conv_layer(tf.reshape(lay1, reshapesize),
-                                [32, 32, 1], [7, 7], 16)
-lay3, lay3size = add_pool_layer(lay2, lay2size)
-lay4 = add_fully_connected(tf.reshape(lay3, [-1, 4096]), 4096, 25, tf.nn.tanh)
+#reshapesize = [-1, 32, 32, 1]
+#lay2, lay2size = add_conv_layer(tf.reshape(lay1, reshapesize), [32, 32, 1], [7, 7], 16)
+#lay3, lay3size = add_pool_layer(lay2, lay2size)
+#lay4 = add_fully_connected(tf.reshape(lay3, [-1, 4096]), 4096, 25, tf.nn.tanh)
 
-dlay5 = add_fully_connected(lay4, 25, 4096, tf.nn.tanh)
-reshapesize = [-1, 16, 16, 16]
-dlay3, dlay3size = add_unpool_layer(tf.reshape(dlay5, reshapesize), [16,16,16], batch_size)
-dlay2, dlay2size = add_deconv_layer(dlay3, dlay3size, [7, 7], 1, batch_size)
-dlay1 = add_fully_connected(tf.reshape(dlay2, [-1, 1024]), 1024, 12288, tf.nn.tanh)
+#dlay5 = add_fully_connected(lay4, 25, 4096, tf.nn.tanh)
+#reshapesize = [-1, 16, 16, 16]
+#dlay3, dlay3size = add_unpool_layer(tf.reshape(dlay5, reshapesize), [16,16,16], batch_size)
+#dlay2, dlay2size = add_deconv_layer(dlay3, dlay3size, [7, 7], 1, batch_size)
+#dlay1 = add_fully_connected(tf.reshape(dlay2, [-1, 1024]), 1024, 12288, tf.nn.tanh)
 
-# Encoder
-#lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 16)
-#lay2, lay2size = add_pool_layer(lay1, lay1size)
-#lay3, lay3size = add_conv_layer(lay1, lay1size, [5, 5], 12)
-#lay4, lay4size = add_pool_layer(lay3, lay3size)
-#lay5, lay5size = add_conv_layer(lay4, lay4size, [3, 3], 4)
-#red_lay5size = reduce_multiply(lay3size)
-#lay6 = add_fully_connected(tf.reshape(lay3, [-1, red_lay5size]), red_lay5size, 20, tf.nn.tanh)
-#lay7 = add_fully_connected(lay6, 128, 15, tf.nn.tanh)
-
-#print("Size of compressed layer: %s, Total size: %d"%
-#      (','.join(map(str, lay7size)) , reduce_multiply(lay7size)))
-
-# Decoder
-#dlay7 = add_fully_connected(lay7, 15, 128, tf.nn.tanh)
-#dlay6 = add_fully_connected(lay6, 20, red_lay5size, tf.nn.tanh)
-#reshapesize = [-1]
-#reshapesize.extend(lay3size)
-#dlay5, dlay5size = add_deconv_layer(tf.reshape(dlay6, reshapesize), lay5size, [3, 3], 32, batch_size)
-#dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
-#dlay3, dlay3size = add_deconv_layer(tf.reshape(dlay6, reshapesize), lay3size, [5, 5], 16, batch_size)
-#dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
-#dlay1, dlay1size = add_deconv_layer(dlay3, dlay3size, [5, 5], 3, batch_size)
-
-#y_image = dlay1
-#y = tf.reshape(dlay1, [-1, 12288])
-y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
-y = dlay1
+y_image = dlay1
+y = tf.reshape(dlay1, [-1, 12288])
+#y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
+#y = dlay1
 #============ training your model =============
 
 l2_loss = tf.nn.l2_loss(y - x)
@@ -157,12 +149,16 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(15000):
+for i in range(25000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
         real_loss = l2_loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
         print("step %d, training loss %g, real loss %g"%(i, train_loss, real_loss))
+    if i%5000 == 0 and i > 0:
+        inp = raw_input("Continue? (anything except n will continue): ")
+        if inp == "n":
+            break
     train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.95})
 
 # save the trained model
