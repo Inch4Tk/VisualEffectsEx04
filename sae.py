@@ -37,7 +37,10 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-n_code = 1000
+def deconv2d(x, W, output_shape):
+    return tf.nn.conv2d_transpose()
+
+n_code = 100
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
 x = tf.reshape(x_image, [-1,12288])
@@ -69,7 +72,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(5000):
+for i in range(10000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
