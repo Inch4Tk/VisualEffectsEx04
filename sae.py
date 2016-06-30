@@ -67,22 +67,15 @@ b_conv3 = bias_variable([48])
 h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
 h_pool3 = max_pool_2x2(h_conv3) #8x8x48
 
-h_rpool3 = tf.reshape(h_pool3, [-1, 8*8*48])
-
-W_fc1 = weight_variable([8*8*48, n_code])
-b_fc1 = bias_variable([n_code])
-h_fc1 = tf.nn.tanh(tf.matmul(h_rpool3, W_fc1) + b_fc1)
-
-W_fc2 = weight_variable([n_code, 64*64*12])
-b_fc2 = bias_variable([64*64*12])
-h_fc2 = tf.nn.tanh(tf.matmul(h_fc1, W_fc2) + b_fc2)
-h_rfc2 = tf.reshape(h_fc2, [-1, 64,64,12])
-
-W_deconv1 = weight_variable([5,5,3,12])
+W_deconv1 = weight_variable([5,5,3,48])
 b_deconv1 = bias_variable([3])
-h_deconv = tf.nn.relu(deconv2d(h_rfc2, W_deconv1, tf.pack([batch_size, 64,64,3])) + b_deconv1)
+h_deconv = tf.nn.relu(deconv2d(h_pool3, W_deconv1, tf.pack([batch_size, 8,8,3])) + b_deconv1)
+h_rdeconv = tf.reshape(h_deconv, [-1, 8*8*3])
 
-y = tf.reshape(h_deconv, [-1, 12288])
+W_fc1 = weight_variable([8*8*3, 12288])
+b_fc1 = bias_variable([12288])
+
+y = tf.nn.tanh(tf.matmul(h_rdeconv, W_fc1) + b_fc1)
 y_image = tf.reshape(y, [-1,64,64,3])
 
 #============ training your model =============
@@ -100,7 +93,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(10000):
+for i in range(20000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
