@@ -88,7 +88,7 @@ x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
-n_code = 15
+n_code = 25
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -98,34 +98,44 @@ x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
 
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 256, tf.nn.tanh)
-lay2 = add_fully_connected(lay1, 256, 15, tf.nn.relu)
-dlay2 = add_fully_connected(lay2, 15, 256, tf.nn.relu)
-dlay1 = add_fully_connected(lay1, 256, 12288, tf.nn.tanh)
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 1024, tf.nn.tanh)
+#lay2 = add_fully_connected(lay1, 256, 15, tf.nn.tanh)
+#dlay2 = add_fully_connected(lay2, 15, 256, tf.nn.tanh)
+reshapesize = [-1, 32, 32, 1]
+lay2, lay2size = add_conv_layer(tf.reshape(lay1, reshapesize),
+                                [32, 32, 1], [7, 7], 16)
+lay3, lay3size = add_pool_layer(lay2, lay2size)
+lay4 = add_fully_connected(tf.reshape(lay3, [-1, 4096]), 4096, 25, tf.nn.tanh)
+
+dlay5 = add_fully_connected(lay4, 25, 4096, tf.nn.tanh)
+reshapesize = [-1, 16, 16, 16]
+dlay3, dlay3size = add_unpool_layer(tf.reshape(dlay5, reshapesize), [16,16,16], batch_size)
+dlay2, dlay2size = add_deconv_layer(dlay3, dlay3size, [7, 7], 1, batch_size)
+dlay1 = add_fully_connected(tf.reshape(dlay2, [-1, 1024]), 1024, 12288, tf.nn.tanh)
 
 # Encoder
 #lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 16)
 #lay2, lay2size = add_pool_layer(lay1, lay1size)
-#lay3, lay3size = add_conv_layer(lay2, lay2size, [4, 4], 32)
+#lay3, lay3size = add_conv_layer(lay1, lay1size, [5, 5], 12)
 #lay4, lay4size = add_pool_layer(lay3, lay3size)
-#lay5, lay5size = add_conv_layer(lay4, lay4size, [3, 3], 16)
-#red_lay5size = reduce_multiply(lay5size)
-#lay6 = add_fully_connected(tf.reshape(lay5, [-1, red_lay5size]), red_lay5size, 1024)
-#lay7 = add_fully_connected(lay6, 1024, 100)
+#lay5, lay5size = add_conv_layer(lay4, lay4size, [3, 3], 4)
+#red_lay5size = reduce_multiply(lay3size)
+#lay6 = add_fully_connected(tf.reshape(lay3, [-1, red_lay5size]), red_lay5size, 20, tf.nn.tanh)
+#lay7 = add_fully_connected(lay6, 128, 15, tf.nn.tanh)
 
 #print("Size of compressed layer: %s, Total size: %d"%
 #      (','.join(map(str, lay7size)) , reduce_multiply(lay7size)))
 
 # Decoder
-#dlay7 = add_fully_connected(lay7, 100, 1024)
-#dlay6 = add_fully_connected(dlay7, 1024, red_lay5size)
+#dlay7 = add_fully_connected(lay7, 15, 128, tf.nn.tanh)
+#dlay6 = add_fully_connected(lay6, 20, red_lay5size, tf.nn.tanh)
 #reshapesize = [-1]
-#reshapesize.extend(lay5size)
+#reshapesize.extend(lay3size)
 #dlay5, dlay5size = add_deconv_layer(tf.reshape(dlay6, reshapesize), lay5size, [3, 3], 32, batch_size)
 #dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
-#dlay3, dlay3size = add_deconv_layer(dlay4, dlay4size, [4, 4], 16, batch_size)
+#dlay3, dlay3size = add_deconv_layer(tf.reshape(dlay6, reshapesize), lay3size, [5, 5], 16, batch_size)
 #dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
-#dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [5, 5], 3, batch_size)
+#dlay1, dlay1size = add_deconv_layer(dlay3, dlay3size, [5, 5], 3, batch_size)
 
 #y_image = dlay1
 #y = tf.reshape(dlay1, [-1, 12288])
@@ -136,7 +146,7 @@ y = dlay1
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.01*weight_penalty
+loss = l2_loss + 0.002*weight_penalty
 
 learning_rate = 1e-4
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
@@ -147,7 +157,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(10000):
+for i in range(15000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
