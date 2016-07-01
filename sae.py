@@ -101,13 +101,13 @@ lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 64)
 lay2, lay2size = add_pool_layer(lay1, lay1size)
 lay3, lay3size = add_conv_layer(lay2, lay2size, [5, 5], 32)
 lay4, lay4size = add_pool_layer(lay3, lay3size)
-lay5 = add_fully_connected(tf.reshape(lay4, [-1, 8192]), 8192, 400, tf.nn.tanh)
-lay6 = add_fully_connected(lay5, 400, 100, tf.nn.relu)
-lay7 = add_fully_connected(lay6, 100, 20, tf.nn.tanh)
+lay5 = add_fully_connected(tf.reshape(lay4, [-1, 8192]), 8192, 20, tf.nn.tanh)
+#lay6 = add_fully_connected(lay5, 400, 100, tf.nn.relu)
+#lay7 = add_fully_connected(lay6, 100, 20, tf.nn.tanh)
 
-dlay7 = add_fully_connected(lay7, 20, 100, tf.nn.tanh)
-dlay6 = add_fully_connected(dlay7, 100, 400, tf.nn.relu)
-dlay5 = add_fully_connected(dlay6, 400, 8192, tf.nn.tanh)
+#dlay7 = add_fully_connected(lay7, 20, 100, tf.nn.tanh)
+#dlay6 = add_fully_connected(dlay7, 100, 400, tf.nn.relu)
+dlay5 = add_fully_connected(lay5, 20, 8192, tf.nn.tanh)
 reshapesize = [-1]
 reshapesize.extend(lay4size)
 dlay4, dlay4size = add_unpool_layer(tf.reshape(dlay5, reshapesize), lay4size, batch_size)
@@ -124,7 +124,7 @@ y = tf.reshape(dlay1, [-1, 12288])
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.002*weight_penalty
+loss = l2_loss + 0.005*weight_penalty
 
 learning_rate = 1e-4
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
