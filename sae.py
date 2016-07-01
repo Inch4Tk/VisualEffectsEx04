@@ -88,7 +88,7 @@ x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
-n_code = 50
+n_code = 20
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -115,24 +115,35 @@ x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 #dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
 #dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [10, 10], 3, batch_size)
 
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 512, tf.nn.tanh)
+#lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 512, tf.nn.tanh)
 #lay2 = add_fully_connected(lay1, 256, 15, tf.nn.tanh)
 #dlay2 = add_fully_connected(lay2, 15, 256, tf.nn.tanh)
-reshapesize = [-1, 16, 16, 2]
-lay2, lay2size = add_conv_layer(tf.reshape(lay1, reshapesize), [16, 16, 2],
-                                [5, 5], 32)
-lay3, lay3size = add_pool_layer(lay2, lay2size)
-lay4, lay4size = add_conv_layer(lay3, lay3size, [3, 3], 16)
-lay5, lay5size = add_pool_layer(lay4, lay4size)
-lay6 = add_fully_connected(tf.reshape(lay5, [-1, 256]), 256, 25, tf.nn.tanh)
+#reshapesize = [-1, 16, 16, 2]
+#lay2, lay2size = add_conv_layer(tf.reshape(lay1, reshapesize), [16, 16, 2], [5, 5], 32)
+#lay3, lay3size = add_pool_layer(lay2, lay2size)
+#lay4, lay4size = add_conv_layer(lay3, lay3size, [3, 3], 16)
+#lay5, lay5size = add_pool_layer(lay4, lay4size)
+#lay6 = add_fully_connected(tf.reshape(lay5, [-1, 256]), 256, 25, tf.nn.tanh)
 
-dlay6 = add_fully_connected(lay6, 25, 256, tf.nn.tanh)
-reshapesize = [-1, 4, 4, 16]
-dlay5, dlay5size = add_unpool_layer(tf.reshape(dlay6, reshapesize), [4,4,16], batch_size)
-dlay4, dlay4size = add_deconv_layer(dlay5, dlay5size, [3, 3], 32, batch_size)
-dlay3, dlay3size = add_unpool_layer(dlay4, dlay4size, batch_size)
-dlay2, dlay2size = add_deconv_layer(dlay3, dlay3size, [5, 5], 2, batch_size)
-dlay1 = add_fully_connected(tf.reshape(dlay2, [-1, 512]), 512, 12288, tf.nn.tanh)
+#dlay6 = add_fully_connected(lay6, 25, 256, tf.nn.tanh)
+#reshapesize = [-1, 4, 4, 16]
+#dlay5, dlay5size = add_unpool_layer(tf.reshape(dlay6, reshapesize), [4,4,16], batch_size)
+#dlay4, dlay4size = add_deconv_layer(dlay5, dlay5size, [3, 3], 32, batch_size)
+#dlay3, dlay3size = add_unpool_layer(dlay4, dlay4size, batch_size)
+#dlay2, dlay2size = add_deconv_layer(dlay3, dlay3size, [5, 5], 2, batch_size)
+#dlay1 = add_fully_connected(tf.reshape(dlay2, [-1, 512]), 512, 12288, tf.nn.tanh)
+
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 1000, tf.nn.tanh)
+lay2 = add_fully_connected(lay1, 1000, 400, tf.nn.relu)
+lay3 = add_fully_connected(lay2, 400, 200, tf.nn.tanh)
+lay4 = add_fully_connected(lay3, 200, 100, tf.nn.relu)
+lay5 = add_fully_connected(lay4, 100, 20, tf.nn.tanh)
+
+dlay5 = add_fully_connected(lay5, 20, 100, tf.nn.tanh)
+dlay4 = add_fully_connected(dlay5, 100, 200, tf.nn.relu)
+dlay3 = add_fully_connected(dlay4, 200, 400, tf.nn.tanh)
+dlay2 = add_fully_connected(dlay3, 400, 1000, tf.nn.relu)
+dlay1 = add_fully_connected(dlay2, 1000, 12288, tf.nn.tanh)
 
 #y_image = dlay1
 #y = tf.reshape(dlay1, [-1, 12288])
@@ -143,7 +154,7 @@ y = dlay1
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.02*weight_penalty
+loss = l2_loss + 0.002*weight_penalty
 
 learning_rate = 1e-4
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
@@ -160,10 +171,10 @@ for i in range(25000):
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
         real_loss = l2_loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
         print("step %d, training loss %g, real loss %g"%(i, train_loss, real_loss))
-    if i%5000 == 0 and i > 0:
-        inp = raw_input("Continue? (anything except n will continue): ")
-        if inp == "n":
-            break
+    #if i%5000 == 0 and i > 0:
+    #    inp = raw_input("Continue? (anything except n will continue): ")
+    #    if inp == "n":
+    #        break
     train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.95})
 
 # save the trained model
