@@ -97,25 +97,22 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
-lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 32, tf.nn.sigmoid)
-lay2, lay2size = add_pool_layer(lay1, lay1size)
-lay3, lay3size = add_conv_layer(lay2, lay2size, [5, 5], 16, tf.nn.sigmoid)
-lay4, lay4size = add_pool_layer(lay3, lay3size)
-lay5 = add_fully_connected(tf.reshape(lay4, [-1, 4096]), 4096, 500, tf.nn.sigmoid)
-lay6 = add_fully_connected(lay5, 500, 20, tf.nn.sigmoid)
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 2000, tf.nn.sigmoid)
+lay2 = add_fully_connected(lay1, 2000, 500, tf.nn.sigmoid)
+lay3 = add_fully_connected(lay2, 500, 200, tf.nn.sigmoid)
+lay4 = add_fully_connected(lay3, 200, 80, tf.nn.sigmoid)
+lay5 = add_fully_connected(lay4, 80, 20, tf.nn.sigmoid)
 
-dlay6 = add_fully_connected(lay6, 20, 4096, tf.nn.sigmoid)
-reshapesize = [-1, 16, 16, 16]
-dlay5, dlay5size = add_deconv_layer(tf.reshape(dlay6, reshapesize), [16, 16, 16], [5, 5], 16, batch_size, tf.nn.sigmoid)
-dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
-dlay3, dlay3size = add_deconv_layer(dlay4, dlay4size, [5,5], 32, batch_size, tf.nn.sigmoid)
-dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
-dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [5,5], 3, batch_size, tf.nn.sigmoid)
+dlay5 = add_fully_connected(lay5, 20, 80, tf.nn.sigmoid)
+dlay4 = add_fully_connected(dlay5, 80, 200, tf.nn.sigmoid)
+dlay3 = add_fully_connected(dlay4, 200, 500, tf.nn.sigmoid)
+dlay2 = add_fully_connected(dlay3, 500, 2000, tf.nn.sigmoid)
+dlay1 = add_fully_connected(dlay2, 2000, 12288, tf.nn.sigmoid)
 
-y_image = dlay1
-y = tf.reshape(dlay1, [-1, 12288])
-#y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
-#y = dlay1
+#y_image = dlay1
+#y = tf.reshape(dlay1, [-1, 12288])
+y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
+y = dlay1
 #============ training your model =============
 
 l2_loss = tf.nn.l2_loss(y - x)
@@ -145,8 +142,8 @@ for i in range(25000):
     train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.95})
 
 # save the trained model
-#model_file = saver.save(sess, "model.ckpt")
-#print("Trained model saved to %s"%model_file)
+model_file = saver.save(sess, "model.ckpt")
+print("Trained model saved to %s"%model_file)
 #'''
 
 # alternatively restore the model
