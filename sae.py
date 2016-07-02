@@ -97,30 +97,25 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 100, tf.nn.tanh)
-dlay1 = add_fully_connected(lay1, 100, 12288, tf.nn.tanh)
-#lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 64)
-#lay2, lay2size = add_pool_layer(lay1, lay1size)
-#lay3, lay3size = add_conv_layer(lay2, lay2size, [5, 5], 32)
-#lay4, lay4size = add_pool_layer(lay3, lay3size)
-#lay5 = add_fully_connected(tf.reshape(lay4, [-1, 8192]), 8192, 20, tf.nn.tanh)
-#lay6 = add_fully_connected(lay5, 400, 100, tf.nn.relu)
-#lay7 = add_fully_connected(lay6, 100, 20, tf.nn.tanh)
+lay1, lay1size = add_conv_layer(x_conv, [64, 64, 3], [5, 5], 32, tf.nn.sigmoid)
+lay2, lay2size = add_pool_layer(lay1, lay1size)
+lay3, lay3size = add_conv_layer(lay2, lay2size, [5, 5], 16, tf.nn.sigmoid)
+lay4, lay4size = add_pool_layer(lay3, lay3size)
+lay5 = add_fully_connected(tf.reshape(lay4, [-1, 4096]), 4096, 500, tf.nn.sigmoid)
+lay6 = add_fully_connected(lay5, 500, 20, tf.nn.sigmoid)
 
-#dlay7 = add_fully_connected(lay7, 20, 100, tf.nn.tanh)
-#dlay6 = add_fully_connected(dlay7, 100, 400, tf.nn.relu)
-#dlay5 = add_fully_connected(lay5, 20, 8192, tf.nn.tanh)
-#reshapesize = [-1]
-#reshapesize.extend(lay4size)
-#dlay4, dlay4size = add_unpool_layer(tf.reshape(dlay5, reshapesize), lay4size, batch_size)
-#dlay3, dlay3size = add_deconv_layer(dlay4, dlay4size, [5, 5], 64, batch_size)
-#dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
-#dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [5, 5], 3, batch_size)
+dlay6 = add_fully_connected(lay6, 20, 4096, tf.nn.sigmoid)
+reshapesize = [-1, 16, 16, 16]
+dlay5, dlay5size = add_deconv_layer(tf.reshape(dlay6, reshapesize), [16, 16, 16], [5, 5], 16, batch_size, tf.nn.sigmoid)
+dlay4, dlay4size = add_unpool_layer(dlay5, dlay5size, batch_size)
+dlay3, dlay3size = add_deconv_layer(dlay4, dlay4size, [5,5], 32, batch_size, tf.nn.sigmoid)
+dlay2, dlay2size = add_unpool_layer(dlay3, dlay3size, batch_size)
+dlay1, dlay1size = add_deconv_layer(dlay2, dlay2size, [5,5], 3, batch_size, tf.nn.sigmoid)
 
-#y_image = dlay1
-#y = tf.reshape(dlay1, [-1, 12288])
-y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
-y = dlay1
+y_image = dlay1
+y = tf.reshape(dlay1, [-1, 12288])
+#y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
+#y = dlay1
 #============ training your model =============
 
 l2_loss = tf.nn.l2_loss(y - x)
