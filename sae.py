@@ -88,7 +88,7 @@ x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
-n_code = 100
+n_code = 20
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -97,17 +97,17 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 2000, tf.nn.sigmoid)
-lay2 = add_fully_connected(lay1, 2000, 500, tf.nn.sigmoid)
-lay3 = add_fully_connected(lay2, 500, 200, tf.nn.sigmoid)
-lay4 = add_fully_connected(lay3, 200, 80, tf.nn.sigmoid)
-lay5 = add_fully_connected(lay4, 80, 20, tf.nn.sigmoid)
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 2000, tf.nn.tanh)
+lay2 = add_fully_connected(lay1, 2000, 500, tf.nn.tanh)
+lay3 = add_fully_connected(lay2, 500, 200, tf.nn.tanh)
+lay4 = add_fully_connected(lay3, 200, 80, tf.nn.tanh)
+lay5 = add_fully_connected(lay4, 80, 20, tf.nn.tanh)
 
-dlay5 = add_fully_connected(lay5, 20, 80, tf.nn.sigmoid)
-dlay4 = add_fully_connected(dlay5, 80, 200, tf.nn.sigmoid)
-dlay3 = add_fully_connected(dlay4, 200, 500, tf.nn.sigmoid)
-dlay2 = add_fully_connected(dlay3, 500, 2000, tf.nn.sigmoid)
-dlay1 = add_fully_connected(dlay2, 2000, 12288, tf.nn.sigmoid)
+dlay5 = add_fully_connected(lay5, 20, 80, tf.nn.tanh)
+dlay4 = add_fully_connected(dlay5, 80, 200, tf.nn.tanh)
+dlay3 = add_fully_connected(dlay4, 200, 500, tf.nn.tanh)
+dlay2 = add_fully_connected(dlay3, 500, 2000, tf.nn.tanh)
+dlay1 = add_fully_connected(dlay2, 2000, 12288, tf.nn.tanh)
 
 #y_image = dlay1
 #y = tf.reshape(dlay1, [-1, 12288])
