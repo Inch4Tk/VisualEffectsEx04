@@ -1,6 +1,9 @@
 /ex04/
 /output_data/
 /training_data/
+
+/.idea/
+
 *.ckpt
 *.ckpt.meta
 *.pyc
