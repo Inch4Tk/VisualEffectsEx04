@@ -88,7 +88,7 @@ x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
-n_code = 20
+n_code = 10
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -97,17 +97,17 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 1000, tf.nn.relu)
-lay2 = add_fully_connected(lay1, 1000, 500, tf.nn.relu)
-lay3 = add_fully_connected(lay2, 500, 200, tf.nn.relu)
-lay4 = add_fully_connected(lay3, 200, 80, tf.nn.relu)
-lay5 = add_fully_connected(lay4, 80, 20, tf.nn.relu)
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 10, tf.nn.tanh)
+#lay2 = add_fully_connected(lay1, 1000, 500, tf.nn.relu)
+#lay3 = add_fully_connected(lay2, 500, 200, tf.nn.relu)
+#lay4 = add_fully_connected(lay3, 200, 80, tf.nn.relu)
+#lay5 = add_fully_connected(lay4, 80, 20, tf.nn.relu)
 
-dlay5 = add_fully_connected(lay5, 20, 80, tf.nn.relu)
-dlay4 = add_fully_connected(dlay5, 80, 200, tf.nn.relu)
-dlay3 = add_fully_connected(dlay4, 200, 500, tf.nn.relu)
-dlay2 = add_fully_connected(dlay3, 500, 1000, tf.nn.relu)
-dlay1 = add_fully_connected(dlay2, 1000, 12288, tf.nn.relu)
+#dlay5 = add_fully_connected(lay5, 20, 80, tf.nn.relu)
+#dlay4 = add_fully_connected(dlay5, 80, 200, tf.nn.relu)
+#dlay3 = add_fully_connected(dlay4, 200, 500, tf.nn.relu)
+#dlay2 = add_fully_connected(dlay3, 500, 1000, tf.nn.relu)
+dlay1 = add_fully_connected(lay1, 10, 12288, tf.nn.tanh)
 
 #y_image = dlay1
 #y = tf.reshape(dlay1, [-1, 12288])
@@ -118,9 +118,9 @@ y = dlay1
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.005*weight_penalty
+loss = l2_loss + 0.0011*weight_penalty
 
-learning_rate = 1e-4
+learning_rate = 0.000125
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 init_op = tf.initialize_all_variables()
 saver = tf.train.Saver()
@@ -129,7 +129,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(25000):
+for i in range(40000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
@@ -139,7 +139,7 @@ for i in range(25000):
     #    inp = raw_input("Continue? (anything except n will continue): ")
     #    if inp == "n":
     #        break
-    train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.95})
+    train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.85})
 
 # save the trained model
 model_file = saver.save(sess, "model.ckpt")
