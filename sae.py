@@ -88,7 +88,7 @@ x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
-n_code = 3
+n_code = 8
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -97,22 +97,21 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 3, tf.nn.tanh)
-#lay2 = add_fully_connected(lay1, 1000, 500, tf.nn.relu)
-#lay3 = add_fully_connected(lay2, 500, 200, tf.nn.relu)
-#lay4 = add_fully_connected(lay3, 200, 80, tf.nn.relu)
-#lay5 = add_fully_connected(lay4, 80, 20, tf.nn.relu)
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 256, tf.nn.tanh)
+lay2, lay2size = add_conv_layer(tf.reshape(lay1, [-1, 16, 16, 1]), [16, 16, 1], [3, 3], 32)
+lay3 = add_fully_connected(tf.reshape(lay2, [-1, 8192]), 8192, 8, tf.nn.tanh)
+ 
+dlay3 = add_fully_connected(lay3, 8, 8192, tf.nn.tanh)
+rs = [-1]
+rs.extend(lay2size)
+dlay2, dlay2size = add_deconv_layer(tf.reshape(dlay3, rs), lay2size, [3,3], 1, batch_size)
+dlay1 = add_fully_connected(tf.reshape(dlay2, [-1, 256]), 256, 12288, tf.nn.tanh)
 
-#dlay5 = add_fully_connected(lay5, 20, 80, tf.nn.relu)
-#dlay4 = add_fully_connected(dlay5, 80, 200, tf.nn.relu)
-#dlay3 = add_fully_connected(dlay4, 200, 500, tf.nn.relu)
-#dlay2 = add_fully_connected(dlay3, 500, 1000, tf.nn.relu)
-dlay1 = add_fully_connected(lay1, 3, 12288, tf.nn.tanh)
 
-#y_image = dlay1
-#y = tf.reshape(dlay1, [-1, 12288])
-y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
-y = dlay1
+y_image = dlay1
+y = tf.reshape(dlay1, [-1, 12288])
+#y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
+#y = dlay1
 #============ training your model =============
 
 l2_loss = tf.nn.l2_loss(y - x)
