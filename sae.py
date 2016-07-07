@@ -50,7 +50,7 @@ alphas = tf.placeholder(tf.float32, shape=[None, 1])
 batch_size = tf.shape(x)[0]
 num_feat_maps = 4
 num_channles = 3
-n_code = 100
+n_code = 8*8*3
 
 W_conv1 = weight_variable([5, 5, 3, 12])
 b_conv1 = bias_variable([12])
@@ -62,12 +62,12 @@ b_conv2 = bias_variable([24])
 h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
 h_pool2 = max_pool_2x2(h_conv2) #16x16x24
 
-W_conv3 = weight_variable([5, 5, 24, 48])
+W_conv3 = weight_variable([2, 2, 24, 48])
 b_conv3 = bias_variable([48])
 h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
 h_pool3 = max_pool_2x2(h_conv3) #8x8x48
 
-W_deconv1 = weight_variable([5,5,3,48])
+W_deconv1 = weight_variable([2,2,3,48])
 b_deconv1 = bias_variable([3])
 h_deconv = tf.nn.relu(deconv2d(h_pool3, W_deconv1, tf.pack([batch_size, 8,8,3])) + b_deconv1)
 h_rdeconv = tf.reshape(h_deconv, [-1, 8*8*3])
