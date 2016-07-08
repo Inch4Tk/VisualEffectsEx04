@@ -30,22 +30,60 @@ def bias_variable(shape):
   initial = tf.constant(0.1, shape=shape)
   return tf.Variable(initial)
 
+def conv2d(x, W):
+  return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+
+def max_pool_2x2(x):
+  return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
+                        strides=[1, 2, 2, 1], padding='SAME')
+def deconv2d(x, W, shape):
+    return tf.nn.conv2d_transpose(x, W, shape, strides=[1, 1, 1, 1], padding='SAME') 
+
 n_code = 1000
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
 x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
-W_1 = weight_variable([12288, n_code])
+W_conv1 = weight_variable([10,10,3,3])
+b_conv1 = bias_variable([3])
+h_conv1 = tf.nn.tanh(conv2d(x_image, W_conv1) + b_conv1)
+
+W_conv2 = weight_variable([5,5,3,3])
+b_conv2 = bias_variable([3])
+h_conv2 = tf.nn.tanh(conv2d(h_conv1, W_conv2) + b_conv2)
+
+W_conv3 = weight_variable([3,3,3,3])
+b_conv3 = bias_variable([3])
+h_conv3 = tf.nn.tanh(conv2d(h_conv2, W_conv3) + b_conv3)
+
+x_1 = tf.reshape(h_conv3,[-1,64*64*3])
+
+W_1 = weight_variable([64*64*3, n_code])
 b_1 = bias_variable([n_code])
 
-z=tf.nn.tanh(tf.matmul(x, W_1) + b_1)
+z = tf.nn.tanh(tf.matmul(x_1, W_1) + b_1)
 
-W_2 = weight_variable([n_code, 12288])
-b_2 = bias_variable([12288])
+W_2 = weight_variable([n_code, 64*64*3])
+b_2 = bias_variable([64*64*3])
+y_1 = tf.nn.tanh(tf.matmul(z,W_2)+b_2)
 
-y = tf.nn.tanh(tf.matmul(z, W_2) + b_2)
-y_image = tf.reshape(y, [-1,64,64,3])
+y_2 = tf.reshape(y_1, [-1,64,64,3])
+
+W_deconv1 = weight_variable([3,3,3,3])
+b_deconv1 = bias_variable([3])
+h_deconv1 = tf.nn.tanh(deconv2d(y_2,W_deconv1, [1,64,64,3]) + b_deconv1)
+
+W_deconv2 = weight_variable([3,3,3,3])
+b_deconv2 = bias_variable([3])
+h_deconv2 = tf.nn.tanh(deconv2d(h_deconv1, W_conv2, [1,64,64,3]) + b_conv2)
+
+W_deconv3 = weight_variable([3,3,3,3])
+b_deconv3 = bias_variable([3])
+h_deconv3 = tf.nn.tanh(deconv2d(h_deconv2, W_conv3, [1,64,64,3]) + b_conv3)
+
+y_image = h_deconv3 #tf.reshape(h_deconv3, [-1,64,64,3])
+y = tf.reshape(y_image, [-1,12288])
 
 #============ training your model =============
 
@@ -62,7 +100,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(1000):
+for i in range(50000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
