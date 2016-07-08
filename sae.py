@@ -52,22 +52,22 @@ num_feat_maps = 4
 num_channles = 3
 n_code = 8*8*3
 
-W_conv1 = weight_variable([5, 5, 3, 12])
+W_conv1 = weight_variable([12, 12, 3, 12])
 b_conv1 = bias_variable([12])
 h_conv1 = tf.nn.relu(conv2d(x, W_conv1) + b_conv1)
 h_pool1 = max_pool_2x2(h_conv1) #32x32x12
 
-W_conv2 = weight_variable([5, 5, 12, 24])
+W_conv2 = weight_variable([8, 8, 12, 24])
 b_conv2 = bias_variable([24])
 h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
 h_pool2 = max_pool_2x2(h_conv2) #16x16x24
 
-W_conv3 = weight_variable([2, 2, 24, 48])
+W_conv3 = weight_variable([4, 4, 24, 48])
 b_conv3 = bias_variable([48])
 h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
 h_pool3 = max_pool_2x2(h_conv3) #8x8x48
 
-W_deconv1 = weight_variable([2,2,3,48])
+W_deconv1 = weight_variable([4,4,3,48])
 b_deconv1 = bias_variable([3])
 h_deconv = tf.nn.relu(deconv2d(h_pool3, W_deconv1, tf.pack([batch_size, 8,8,3])) + b_deconv1)
 h_rdeconv = tf.reshape(h_deconv, [-1, 8*8*3])
@@ -83,7 +83,7 @@ x = tf.reshape(x, [-1, 12288])
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.01*weight_penalty
+loss = l2_loss + 0.001*weight_penalty
 
 train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
 init_op = tf.initialize_all_variables()
@@ -93,7 +93,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(20000):
+for i in range(30000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
