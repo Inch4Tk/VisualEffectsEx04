@@ -40,6 +40,23 @@ def max_pool_2x2(x):
 def deconv2d(x, W, output_shape):
     return tf.nn.conv2d_transpose(x, W, output_shape, strides=[1,1,1,1], padding='SAME')
 
+def unpool(value, name='unpool'):
+    """N-dimensional version of the unpooling operation from
+    https://www.robots.ox.ac.uk/~vgg/rg/papers/Dosovitskiy_Learning_to_Generate_2015_CVPR_paper.pdf
+
+    :param value: A Tensor of shape [b, d0, d1, ..., dn, ch]
+    :return: A Tensor of shape [b, 2*d0, 2*d1, ..., 2*dn, ch]
+    """
+    with tf.name_scope(name) as scope:
+        sh = value.get_shape().as_list()
+        dim = len(sh[1:-1])
+        out = (tf.reshape(value, [-1] + sh[-dim:]))
+        for i in range(dim, 0, -1):
+            out = tf.concat(i, [out, tf.zeros_like(out)])
+        out_size = [-1] + [s * 2 for s in sh[1:-1]] + [sh[-1]]
+        out = tf.reshape(out, out_size, name=scope)
+    return out
+
 
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
 x = tf.reshape(x_image, [-1, 64,64,3])
@@ -52,27 +69,30 @@ num_feat_maps = 4
 num_channles = 3
 n_code = 8*8*3
 
-W_conv1 = weight_variable([12, 12, 3, 12])
-b_conv1 = bias_variable([12])
+W_conv1 = weight_variable([12, 12, 3, 48])
+b_conv1 = bias_variable([48])
 h_conv1 = tf.nn.relu(conv2d(x, W_conv1) + b_conv1)
 h_pool1 = max_pool_2x2(h_conv1) #32x32x12
 
-W_conv2 = weight_variable([8, 8, 12, 24])
+W_conv2 = weight_variable([8, 8, 48, 24])
 b_conv2 = bias_variable([24])
 h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
 h_pool2 = max_pool_2x2(h_conv2) #16x16x24
 
-W_conv3 = weight_variable([4, 4, 24, 48])
-b_conv3 = bias_variable([48])
+W_conv3 = weight_variable([4, 4, 24, 12])
+b_conv3 = bias_variable([12])
 h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
-h_pool3 = max_pool_2x2(h_conv3) #8x8x48
+h_pool3 = max_pool_2x2(h_conv3) #8x8x12
 
-W_deconv1 = weight_variable([4,4,3,48])
+#h_unpool1 = unpool(h_pool3)
+h_unpool1 = tf.image.resize_images(h_pool3, 16,16)
+
+W_deconv1 = weight_variable([4,4,3,12])
 b_deconv1 = bias_variable([3])
-h_deconv = tf.nn.relu(deconv2d(h_pool3, W_deconv1, tf.pack([batch_size, 8,8,3])) + b_deconv1)
-h_rdeconv = tf.reshape(h_deconv, [-1, 8*8*3])
+h_deconv = tf.nn.relu(deconv2d(h_unpool1, W_deconv1, tf.pack([batch_size, 16,16,3])) + b_deconv1)
+h_rdeconv = tf.reshape(h_deconv, [-1, 16*16*3])
 
-W_fc1 = weight_variable([8*8*3, 12288])
+W_fc1 = weight_variable([16*16*3, 12288])
 b_fc1 = bias_variable([12288])
 
 y = tf.nn.tanh(tf.matmul(h_rdeconv, W_fc1) + b_fc1)
@@ -93,7 +113,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(30000):
+for i in range(10000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
