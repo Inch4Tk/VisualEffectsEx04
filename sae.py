@@ -125,7 +125,7 @@ sess.run(init_op)
 
 # train the model
 #'''
-for i in range(10000):
+for i in range(40000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
