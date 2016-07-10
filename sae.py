@@ -109,7 +109,7 @@ y = dlay1
 l2_loss = tf.nn.l2_loss(y - x)
 norm = tf.nn.l2_loss(x)
 weight_penalty = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()])
-loss = l2_loss + 0.001*weight_penalty
+loss = l2_loss + 0.000225*weight_penalty
 
 learning_rate = 0.000125
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
