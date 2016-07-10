@@ -57,17 +57,20 @@ def unpool(value, name='unpool'):
         out = tf.reshape(out, out_size, name=scope)
     return out
 
-
+keep_prob = tf.placeholder("float")
 x_image = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
-x = tf.reshape(x_image, [-1, 64,64,3])
+x_norm = tf.nn.dropout(x_image, keep_prob)
+x = tf.reshape(x_norm, [-1, 64,64,3])
+
 #x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 #paramters
 batch_size = tf.shape(x)[0]
+
 num_feat_maps = 4
 num_channles = 3
-n_code = 20
+n_code = 10
 
 W_conv1 = weight_variable([12, 12, 3, 48])
 b_conv1 = bias_variable([48])
@@ -86,7 +89,7 @@ h_pool3 = max_pool_2x2(h_conv3) #8x8x12
 
 h_reshfc = tf.reshape(h_pool3, [-1, 8*8*12])
 W_fc1 = weight_variable([8*8*12, n_code])
-b_fc1 = bias_variable([20])
+b_fc1 = bias_variable([10])
 
 h_fc1 = tf.nn.tanh(tf.matmul(h_reshfc, W_fc1) + b_fc1)
 
@@ -128,9 +131,10 @@ sess.run(init_op)
 for i in range(40000):
     batch = sdf_data.train.next_batch(1)
     if i%100 == 0:
-        train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1]})
-        print("step %d, training loss %g"%(i, train_loss))
-    train_step.run(feed_dict={x_image: batch[0], alphas: batch[1]})
+        train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
+        real_loss = l2_loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
+        print("step %d, training loss %g, real loss %g"%(i, train_loss, real_loss))
+    train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.85})
 
 # save the trained model
 model_file = saver.save(sess, "model.ckpt")
@@ -144,10 +148,10 @@ print("Trained model saved to %s"%model_file)
 #============ score =============
 #Do not alter this part
 
-err = l2_loss.eval(feed_dict={x_image: sdf_data.test.inputs, alphas: sdf_data.test.labels})
+err = l2_loss.eval(feed_dict={x_image: sdf_data.test.inputs, alphas: sdf_data.test.labels, keep_prob: 1.0})
 print("validation loss: %g"%err)
 
-err = err / norm.eval(feed_dict={x_image: sdf_data.test.inputs, alphas: sdf_data.test.labels})
+err = err / norm.eval(feed_dict={x_image: sdf_data.test.inputs, alphas: sdf_data.test.labels, keep_prob: 1.0})
 score = (1 - n_code / float(64*64*3)) * (1 - err)
 print("Your score is %g"%score)
 
@@ -155,7 +159,7 @@ print("Your score is %g"%score)
 
 for i in range(5):
     ref = sdf_data.test.inputs[i]
-    gen = sess.run(y_image, feed_dict={x_image:[ref]})
+    gen = sess.run(y_image, feed_dict={x_image:[ref], keep_prob: 1.0})
 
     fig, [ax1, ax2]= plt.subplots(1, 2, figsize=(6, 3))
     _ = ax1.quiver(ref[:,:,0], ref[:,:,1], pivot='tail', color='k', scale=1 / 1)
@@ -189,7 +193,7 @@ all_labels = np.concatenate((sdf_data.train.labels, sdf_data.test.labels), axis=
 N = all_labels.shape[0]
 
 for i in range(N):
-    enc = 100*sess.run(y_image, feed_dict={x_image:[all_data[i]]})
+    enc = 100*sess.run(y_image, feed_dict={x_image:[all_data[i]], keep_prob: 1.0})
     loc = save_dir + '/vel_%06d.uni' % all_labels[i]
     uniio.writeuni(loc, head, enc)
 
