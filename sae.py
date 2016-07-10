@@ -67,7 +67,7 @@ alphas = tf.placeholder(tf.float32, shape=[None, 1])
 batch_size = tf.shape(x)[0]
 num_feat_maps = 4
 num_channles = 3
-n_code = 8*8*3
+n_code = 20
 
 W_conv1 = weight_variable([12, 12, 3, 48])
 b_conv1 = bias_variable([48])
@@ -84,8 +84,20 @@ b_conv3 = bias_variable([12])
 h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
 h_pool3 = max_pool_2x2(h_conv3) #8x8x12
 
+h_reshfc = tf.reshape(h_pool3, [-1, 8*8*12])
+W_fc1 = weight_variable([8*8*12, n_code])
+b_fc1 = bias_variable([20])
+
+h_fc1 = tf.nn.tanh(tf.matmul(h_reshfc, W_fc1) + b_fc1)
+
+W_fc2 = weight_variable([n_code, 8*8*12])
+b_fc2 = bias_variable([8*8*12])
+h_fc2 = tf.nn.tanh(tf.matmul(h_fc1, W_fc2) + b_fc2)
+
+h_rpool3 = tf.reshape(h_fc2, [-1, 8, 8, 12])
+
 #h_unpool1 = unpool(h_pool3)
-h_unpool1 = tf.image.resize_images(h_pool3, 16,16)
+h_unpool1 = tf.image.resize_images(h_rpool3, 16,16)
 
 W_deconv1 = weight_variable([4,4,3,12])
 b_deconv1 = bias_variable([3])
