@@ -89,7 +89,7 @@ h_pool3 = max_pool_2x2(h_conv3) #8x8x12
 
 h_reshfc = tf.reshape(h_pool3, [-1, 8*8*12])
 W_fc1 = weight_variable([8*8*12, n_code])
-b_fc1 = bias_variable([10])
+b_fc1 = bias_variable([n_code])
 
 h_fc1 = tf.nn.tanh(tf.matmul(h_reshfc, W_fc1) + b_fc1)
 
