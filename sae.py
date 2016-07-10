@@ -88,7 +88,7 @@ x = tf.reshape(x_image, [-1,12288])
 alphas = tf.placeholder(tf.float32, shape=[None, 1])
 
 # Weights and Biases
-n_code = 8
+n_code = 10
 batch_size = tf.shape(x_image)[0]
 
 # Dropout
@@ -97,21 +97,13 @@ x_norm = tf.nn.dropout(x, keep_prob)
 x_conv = tf.reshape(x_norm, [-1, 64, 64, 3])
 
 # Build autoencoder
-lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 256, tf.nn.tanh)
-lay2, lay2size = add_conv_layer(tf.reshape(lay1, [-1, 16, 16, 1]), [16, 16, 1], [3, 3], 32)
-lay3 = add_fully_connected(tf.reshape(lay2, [-1, 8192]), 8192, 8, tf.nn.tanh)
- 
-dlay3 = add_fully_connected(lay3, 8, 8192, tf.nn.tanh)
-rs = [-1]
-rs.extend(lay2size)
-dlay2, dlay2size = add_deconv_layer(tf.reshape(dlay3, rs), lay2size, [3,3], 1, batch_size)
-dlay1 = add_fully_connected(tf.reshape(dlay2, [-1, 256]), 256, 12288, tf.nn.tanh)
+lay1 = add_fully_connected(tf.reshape(x_conv, [-1, 12288]), 12288, 10, tf.nn.tanh)
+dlay1 = add_fully_connected(lay1, 10, 12288, tf.nn.tanh)
 
-
-y_image = dlay1
-y = tf.reshape(dlay1, [-1, 12288])
-#y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
-#y = dlay1
+#y_image = dlay1
+#y = tf.reshape(dlay1, [-1, 12288])
+y_image = tf.reshape(dlay1, [-1, 64, 64, 3])
+y = dlay1
 #============ training your model =============
 
 l2_loss = tf.nn.l2_loss(y - x)
@@ -134,10 +126,6 @@ for i in range(100000):
         train_loss = loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
         real_loss = l2_loss.eval(feed_dict={x_image:batch[0], alphas: batch[1], keep_prob: 1.0})
         print("step %d, training loss %g, real loss %g"%(i, train_loss, real_loss))
-    #if i%5000 == 0 and i > 0:
-    #    inp = raw_input("Continue? (anything except n will continue): ")
-    #    if inp == "n":
-    #        break
     train_step.run(feed_dict={x_image: batch[0], alphas: batch[1], keep_prob: 0.85})
 
 # save the trained model
@@ -160,30 +148,6 @@ score = (1 - n_code / float(64*64*3)) * (1 - err)
 print("Your score is %g"%score)
 
 #============ validating your model =============
-for i in range(5):
-    batch = sdf_data.train.next_batch(1)
-    ref = batch[0][0]
-    gen = sess.run(y_image, feed_dict={x_image:[ref], keep_prob: 1.0})
-       
-    fig, [ax1, ax2]= plt.subplots(1, 2, figsize=(6, 3))
-    _ = ax1.quiver(ref[:,:,0], ref[:,:,1], pivot='tail', color='k', scale=1 / 1)
-    _ = ax2.quiver(gen[0,:,:,0], gen[0,:,:,1], pivot='tail', color='k', scale=1 / 1)
-
-    ax1.set_xlim(0, 60)
-    ax1.set_ylim(0, 60)
-    ax2.set_xlim(0, 60)
-    ax2.set_ylim(0, 60)
-
-    ax1.get_xaxis().set_visible(False)
-    ax1.get_yaxis().set_visible(False)
-    ax2.get_xaxis().set_visible(False)
-    ax2.get_yaxis().set_visible(False)
-    
-    fig.savefig("derp_%g.png" % i)
-    
-    train_loss = l2_loss.eval(feed_dict={x_image:[ref], alphas: batch[1], keep_prob: 1.0})
-    print("loss on first batches %i, loss %g"%(i, train_loss))
-    
 for i in range(5):
     ref = sdf_data.test.inputs[i]
     gen = sess.run(y_image, feed_dict={x_image:[ref], keep_prob: 1.0})
