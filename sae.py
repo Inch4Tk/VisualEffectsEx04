@@ -70,7 +70,7 @@ batch_size = tf.shape(x)[0]
 
 num_feat_maps = 4
 num_channles = 3
-n_code = 10
+n_code = 20
 
 W_conv1 = weight_variable([12, 12, 3, 48])
 b_conv1 = bias_variable([48])
